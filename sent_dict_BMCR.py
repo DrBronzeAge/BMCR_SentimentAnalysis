@@ -11,7 +11,7 @@ http://bmcr.brynmawr.edu/2000/2000-01-14.html
 http://bmcr.brynmawr.edu/2009/2009-01-15.html
 http://bmcr.brynmawr.edu/2009/2009-02-15.html
 http://bmcr.brynmawr.edu/2012/2012-01-02.html
-@author: s
+@author: Anonymous
 """
 import pickle
 sentiment_Words={
@@ -123,7 +123,4 @@ sentiment_Words={
 
 
 with open('sentimentWords.pickle', 'wb') as f:
-    # The protocol version used is detected automatically, so we do not
-    # have to specify it.
-
     pickle.dump(sentiment_Words, f, pickle.HIGHEST_PROTOCOL)

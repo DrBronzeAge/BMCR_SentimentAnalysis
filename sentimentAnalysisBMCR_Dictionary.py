@@ -69,10 +69,22 @@ class Sentiments(Outputlist):
             #common problems.
             print("You are not me. I can't diagnose your database problem.")
 
-
+#TODO Make all of those functions internal class methods
 class SentimentAnalyzer(dictionary=diction):
+    """This class contains all of the functions necessary to both fine-tune
+    your sentiment dictionary, and to actually perform the analysis at scale. 
+    For now, it assumes that users will make additions/subtractions/changes to
+    the sentiment dictionary manually.
+    The only parameter the class needs to initialize is a dictionary where the
+    keys are 'Sentiment Words' like 'excellent' or 'terrible' and the values are
+    strings from the set{'positive','negative','increment','decrement','invert'}.
+    """
     def __init__(self, dictionary):
         self.D=self.dictionary
+    #Todo implement a testAccuracy method
+    #Todo implement a method to perform the analysis
+    
+        
     
 
 #foo=revs.find_one()['Text']  #just reminding myself of the structure of these
