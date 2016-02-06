@@ -82,6 +82,20 @@ class SentimentAnalyzer(dictionary=diction):
     def __init__(self, dictionary):
         self.D=self.dictionary
     #Todo implement a testAccuracy method
+    def TestAccuracy(self, GoldenSet):
+        """Call this method to begin calculating the accuracy (F1 Score) of the
+        current instance of the sentiment analyzer. The process requres the user
+        to provide accurate scores for each sentence in the Golden Set. If the
+        user has some pre-scored sentences, great.  If not, there will be a
+        method implemented below to make the process easier.  Just as a warning,
+        if you plan to adjust your sentiment dictionary based on problems that 
+        emerge in this test, you will need to provide an entirely different 
+        'GoldenSet' to run the test again, at least if you are actually interested
+        in measuring general performance.
+        The golden set should be a list of tuples:
+        [(PlaintTextSentence (str), TrueScore(float--usually between -2 and +2))]
+        The output will be four numbers between 0 and 1
+        """
     #Todo implement a method to perform the analysis
     
         
