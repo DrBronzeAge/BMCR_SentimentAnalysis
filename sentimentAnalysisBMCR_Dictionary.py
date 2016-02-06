@@ -4,13 +4,15 @@ Created on Wed Nov  4 14:34:56 2015
 A Sentiment Analysis engine for Book reviews on the Brynn Mawr Classical Review.
 It was inspired by this: 
 http://fjavieralba.com/basic-sentiment-analysis-with-python.html
-I scraped the book reviews from the web (http://bmcr.brynmawr.edu/), processed
-them a little bit and made a database of them in MongoDB.
-This feeds on the raw text of those reviews.  It only calculates a score for
-each sentence. It's trivial to sum the scores of the sentences when I want them,
-and being able to quickly select sentences that are 'positive' or 'critical' is
-more useful for my research.
-@author: Chris
+This module assumes that you are me, and that you have already scraped ~9000
+book reviews from the web (http://bmcr.brynmawr.edu/), processed
+them a little bit and made a database of them in MongoDB. If you aren't me (or
+haven't run the rest of the code for this project) the Sentiment_Analyzer
+class will accept the raw text of any book review. It only calculates a score for
+each individual sentence.  The default dictionary was made by an expert in book 
+reviews on Ancient History and Classics. If you are applying it to reviews of 
+books in another discipline, you may need to revise it.
+@author: Anonymous
 """
 
 import nltk
@@ -31,10 +33,47 @@ with open('sentimentWords.pickle', 'rb') as f:
 frog=nltk.corpus.stopwords.words('french')
 kraut=nltk.corpus.stopwords.words('german')
 wasp=nltk.corpus.stopwords.words('english')
-    
+
+#you'll only need these if you're me    
 cli=pymongo.MongoClient()
 db=cli['bmcr']
 revs=db['reviews_raw']
+
+class Sentiments(Outputlist):
+    """Container Class for the output of the Sentiment Analysis.
+       It should only get called in conjunction with the do_analysis()
+       method of the SentimentAnalyzer class.
+       On the off chance that it isn't, it expects a list of threeples 
+       (sentiment score,plaintextOfSentence,[TaggedTokens]).
+    """
+    def __init__(self, Outputlist):
+        self.sentiments=Outputlist
+        self.PlainText=[P for S,P,T in Outputlist]
+        self.Scores=[S for S,P,T in Outputlist]
+        self.Tokens=[T for S,P,T in Outputlist]    
+        self.OverallScore=sum(self.Scores)
+        self.Praise=[(S,P) for S,P,T in Outputlist if S>0]
+        self.Blame=[(S,P) for S,P,T in Outputlist if S<0]
+        
+    def StoreInMongoDB(self,reviewdb=revs,quer,ObjectName='Sentiments'):
+        """Another method that assumes you're me. This will append the sentiments
+        to the MongoDB record for the review they came from.
+        quer is most likely going to be something on the form 
+        quer={'_id':key} where key is the unique id of this review.
+        """
+        try:
+            reviewdb.update_one(quer,{'$set':{ObjectName:self.sentiments}})
+            print('Database successfully Updated')
+        except:
+            #TODO: Add specialized error messages with hints for how to solve
+            #common problems.
+            print("You are not me. I can't diagnose your database problem.")
+
+
+class SentimentAnalyzer(dictionary=diction):
+    def __init__(self, dictionary):
+        self.D=self.dictionary
+    
 
 #foo=revs.find_one()['Text']  #just reminding myself of the structure of these
 
