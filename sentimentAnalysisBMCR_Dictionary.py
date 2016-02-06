@@ -96,6 +96,9 @@ class SentimentAnalyzer(dictionary=diction):
         [(PlaintTextSentence (str), TrueScore(float--usually between -2 and +2))]
         The output will be four numbers between 0 and 1
         """
+        
+        RealSet=[]
+        
     #Todo implement a method to perform the analysis
     
         
