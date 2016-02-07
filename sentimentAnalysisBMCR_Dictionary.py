@@ -96,8 +96,12 @@ class SentimentAnalyzer(dictionary=diction):
         [(PlaintTextSentence (str), TrueScore(float--usually between -2 and +2))]
         The output will be four numbers between 0 and 1
         """
-        
-        RealSet=[]
+        TestFodder='  '.join([s for s,ts in GoldenSet])
+        RealSet=[S for S,P,T in DoSentAnalysis(TestFodder)]
+        if len(RealSet)!=len(GoldenSet):
+            return("Could not calculate F score; Number of Sentences in GoldenSet"+
+            ' and Test Set do not match')
+                                    
         
     #Todo implement a method to perform the analysis
     
