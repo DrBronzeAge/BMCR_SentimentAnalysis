@@ -8,6 +8,13 @@
 # of positive and negative sentences.
 # The one labled dat2 is a collection of frequency distributions for the 2300 +change words (excluding stopwords)
 # that show up in sentences that were scored as either critical or positive (in a hand full of permutations).
+# One tip for people new to the wordcloud package: its layout algorithm is not perfectly deterministic, or at
+# least not transparently so.  Run twice on the same data, different words may appear in different places, so be 
+# careful when calling attention to specific details.
+
+
+# NOTE: I have currently commented out the background images, since it isn't clear I have rights to post the
+# original files on github. Please do find your own pictures and swap them in.
 
 
 #general housekeeping at the top
@@ -68,11 +75,11 @@ fd<-data.frame(fd)
 #sentences next to each other
 
 par(mfrow=c(1,2))
-wordcloud(row.names(fd),fd$Praise,main='Words of Praise',max.words=90, colors=topo.colors(5))
-ImageOverlay('clouds.png')
+wordcloud(row.names(fd),fd$Praise,main='Words of Praise',max.words=40, colors=topo.colors(5))
+#ImageOverlay('clouds.png')
 title('Sentences of Praise', family='C')
-wordcloud(row.names(fd),fd$Blame,max.words=90, colors=heat.colors(5))
-ImageOverlay('clouds.png')
+wordcloud(row.names(fd),fd$Blame,max.words=50, colors=heat.colors(5))
+#ImageOverlay('clouds.png')
 title('Sentences of Blame', family='C')
 
 
@@ -119,8 +126,8 @@ pcols<-c(rep('navy',36),rep(colours()[142],59), rep(colours()[556],54),rep(colou
 #PraisHeatCloud
 par(mfrow=c(1,1))
 wordcloud(pos$word,pos$positive, colors=pcols,ordered.colors=TRUE,random.order=FALSE,scale=c(4,.3))
-ImageOverlay('clouds.png')
-legend(-.4,.3,c('Decreased > 10%','Held Steady','Increased > 10%','Increased > 100%'),lty=c(1,1,1,1),lwd=c(2,2,2,2),col=unique(pcols),cex=.8)
+#ImageOverlay('clouds.png')
+legend(-.26,.26,c('Decreased > 10%','Held Steady','Increased > 10%','Increased > 100%'),lty=c(1,1,1,1),lwd=c(2,2,2,2),col=unique(pcols),cex=.8)
 #wordcloud also doesn't play nicely with the 'title' parameter, so we do it manually
 text(.5,1.01,labels="Words of Praise",family="C",cex=1.4)
 
@@ -128,7 +135,7 @@ text(.5,1.01,labels="Words of Praise",family="C",cex=1.4)
 
 wordcloud(crit$word,crit$positive, colors=ncols,ordered.colors=TRUE,random.order=FALSE,scale=c(4,.3))
 ImageOverlay('clouds.png')
-legend(-.4,.3,c('Decreased > 10%','Held Steady','Increased > 10%','Increased > 100%'),lty=c(1,1,1,1),lwd=c(2,2,2,2),col=unique(pcols),cex=.8)
+legend(-.26,.26,c('Decreased > 10%','Held Steady','Increased > 10%','Increased > 100%'),lty=c(1,1,1,1),lwd=c(2,2,2,2),col=unique(pcols),cex=.8)
 text(.5,1.01,labels="Words of Blame",family="C",cex=1.4)
 
 
@@ -152,16 +159,16 @@ dat$bibpos<-bibpos
 dat$bibneg<-bibneg
 
 plot(dat$pages,dat$score,xlim=c(100,800),ylim=c(0,8),pch=1, cex=.5,col='blue',xlab='Book Length (pages)',ylab='Score')
-ImageOverlay('milestone.png',.3)
+#ImageOverlay('milestone.png',.3)
 title("Longer Books Get Better
       Reviews",family='C')
 
 reg<-lm(dat$score~dat$pages) #VERY significant
-bp<-lm(dat$score~dat$pages, subset=(dat$bibpos==TRUE)) #only significant at p=.05
-bn<-lm(dat$score~dat$pages, subset=(dat$bibneg==TRUE)) #not significant, sample to small
+bp<-lm(dat$score~dat$pages, subset=(dat$bibpos==TRUE)) #only significant at p=.05, won't show
+bn<-lm(dat$score~dat$pages, subset=(dat$bibneg==TRUE)) #not statistically significant, effect is minor anyways
 abline(reg,col='tomato',lwd=3)
-legend(610,2,'Average Score
-       by Length',lty=1,lwd=2,col='tomato')
+legend(600,1.5,'Average Score
+       by Length',lty=1,lwd=2,col='tomato',cex=.8)
 
 #abline(bp,col='navy',lwd=3)
 #abline(bn,col='goldenrod',lwd=3)
