@@ -103,6 +103,14 @@ class SentimentAnalyzer(dictionary=diction):
             return("Could not calculate F score; Number of Sentences in GoldenSet"+
             ' and Test Set do not match')
         return(CalcFScore(GoldenScores,RealSet))
+    
+    def AnalyzeReview(self,review):
+        """
+        Method to actually do the analysis. It just calls several of the functions
+        below. Parameters are the self.D (sentiment dictionary) and the plaintext
+        of a review (or reviews, really.  I wouldn't want to join them all into
+        one and keep them in a big bag, but if someone else does they can.)
+        """
 
                                     
         
@@ -208,7 +216,7 @@ def testLanguage(sample,frog=frog, kraut=kraut, wasp=wasp):
 
 
 
-def DoSentAnalysis(doc):
+def DoSentAnalysis(doc,dictionary=diction):
     """
     Input is assumed to be a document from the BMCR.reveiws_raw database
     although it would work on any dict-like object with a field called 'Text'.
@@ -216,8 +224,9 @@ def DoSentAnalysis(doc):
     English), or a list of threeples: 1) Float(score),2)Sentence, as a single,
     string, 3) sentence as a list of (word, POS_tag, sentiment_value) tuples
     It's big, but the tokenization and POS_tagging is by far the most 'expensive'
-    part of the process. So I was happy to trade a few MB of hard-disk space for
-    never having to run it again.
+    part of this process. This function returns all of it for cases--like mine--
+    where sacrificing a few MB of disk space by putting the the tagged_tokens in
+    storage is better than having to repeatedly run the tokenizer.
     """
     sents1=nltk.sent_tokenize(stringify(doc['Text']))
     wsents=[nltk.word_tokenize(sent) for sent in sents1] 
@@ -229,7 +238,7 @@ def DoSentAnalysis(doc):
     if testLanguage(smp)=='ENG':
         sents=[nltk.pos_tag(sent) for sent in wsents]
         #~8 seconds to run, on average
-        sentThreep=[([(tup[0],tup[1],TagForSentiment(tup)) for tup in sent])
+        sentThreep=[([(tup[0],tup[1],TagForSentiment(tup,dictionary=dictionary)) for tup in sent])
         for sent in sents] 
         sentFinal=[(sent,ScoreSentence(sent)) for sent in sentThreep]
         return([(sentFinal[ct][1],sents1[ct],sentFinal[ct][0]) for ct in 
