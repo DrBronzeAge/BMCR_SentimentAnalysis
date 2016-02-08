@@ -96,11 +96,14 @@ class SentimentAnalyzer(dictionary=diction):
         [(PlaintTextSentence (str), TrueScore(float--usually between -2 and +2))]
         The output will be four numbers between 0 and 1
         """
+        GoldenScores=[ts for s,ts in GoldenSet]
         TestFodder='  '.join([s for s,ts in GoldenSet])
         RealSet=[S for S,P,T in DoSentAnalysis(TestFodder)]
         if len(RealSet)!=len(GoldenSet):
             return("Could not calculate F score; Number of Sentences in GoldenSet"+
             ' and Test Set do not match')
+        return(CalcFScore(GoldenScores,RealSet))
+
                                     
         
     #Todo implement a method to perform the analysis
@@ -246,15 +249,13 @@ def CalcFScore(RealSet,TestSet):
     TestSet is the scores assigned by the machine, RealSet are the scores
     (normally assigned by a domain expert, i.e. me) against which they'll be
     checked.
-    Returns a list of 6 numbers: True positives, False Positives and 
-    False Negatives for Positive sentiments and Negative sentiments respectively
-    Those can be used to calculate precision and recall, and hence f-score
 
     """
     pos=[] #both will be filled with a lot of true negatives (TN), some True Positives(TP)
     neg=[] #also False Negatives(FN) and False Positives(FP)
     for i in range(0,min(len(RealSet),len(TestSet))):
         r,t=RealSet[i],TestSet[i]
+#        print([r,t])
         if r>=0.5:
             if t>=0.5:
                 pos.append('TP')
@@ -285,23 +286,39 @@ def CalcFScore(RealSet,TestSet):
             if t<=-0.5:
                 pos.append('TN')
                 neg.append('TP')
-        Ptp=[p for p in pos if p=='TP']
-        Pfp=[p for p in pos if p=='FP']
-        Pfn=[p for p in pos if p=='FN']
-        Ftp=[p for p in neg if p=='TP']
-        Ffp=[p for p in neg if p=='FP']
-        Ffn=[p for p in neg if p=='FN']
+                
+    Praise_true_p=len([p for p in pos if p=='TP'])
+    Praise_false_p=len([p for p in pos if p=='FP'])
+    Praise_false_n=len([p for p in pos if p=='FN'])
+    Blame_true_p=len([p for p in neg if p=='TP'])
+    Blame_false_p=len([p for p in neg if p=='FP'])
+    Blame_false_n=len([p for p in neg if p=='FN'])
         
-        #for reasons I don't see at the moment, these work fine in the interpreter
-        #but become division by zero errors when run in the function.
-        #Not enough of a hassle to worry about fixing it for now
+       
+    praise_precision=Praise_true_p/(Praise_true_p+Praise_false_p)
+    praise_recall=Praise_true_p/(Praise_true_p+Praise_false_n)
+    blame_precision=Blame_true_p/(Blame_true_p+Blame_false_p)
+    blame_recall=Blame_true_p/(Blame_true_p+Blame_false_n)
+        
+    praise_f1=2*praise_precision*praise_recall/(praise_precision+praise_recall)
+    blame_f1=2*blame_precision*blame_recall/(blame_precision+blame_recall)
+        
+#        for reasons I don't see at the moment, these work fine in the interpreter
+#        but become division by zero errors when run in the function.
+#        Not enough of a hassle to worry about fixing it for now
 #        PP=len(Ptp)/(len(Ptp) + len(Pfp))
 #        PR=len(Ptp)/(len(Ptp) + len(Pfn)) 
 #        NP=len(Ftp)/(len(Ftp) + len(Ffp))
 #        NR=len(Ftp)/(len(Ftp) + len(Ffn))      
 #        return ([PP,PR,NP,NR])
         #for now, just return the raw numbers
-        return([len(Ptp),len(Pfp),len(Pfn),len(Ftp),len(Ffp),len(Ffn)])
+    print("F1 score for sentences of praise: %.2f" %(praise_f1))
+    print("F1 score for sentences of blame: %.2f" %(blame_f1))
+    print('*************************************************')
+    print("Precision for sentences of praise: %.2f"%(praise_precision))
+    print("Recall for sentences of praise: %.2f" %(praise_recall))
+    print("Precision for sentences of blame: %.2f" %(blame_precision))
+    print("Recall for sentences of blame: %.2f" %(blame_recall))
 
 
 ####################################################################
@@ -324,7 +341,7 @@ def CalcFScore(RealSet,TestSet):
 ##'TrueScore will be done by hand
 #goldens.to_csv('goldenSetForSA.csv')
 ##done by hand, now read it back in
-#gs=pd.read_csv('truscore.csv',encoding='UTF-8')
+gs=pd.read_csv('truscore.csv',encoding='UTF-8')
 #goldens['TrueScore']=gs['TrueScore']
 ##save some edits
 #gs['TrueScore']=goldens['TrueScore']
