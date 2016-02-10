@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jan 19 18:13:24 2016
-Modified sentiment checker
+IR-PMI sentiment analysis engine (Stands for Information retrieval Pointwise
+Mutual Information)
 This is based on the work of Turney 2002 (http://www.aclweb.org/anthology/P02-1053.pdf)
 which I mostly love because of it's brilliant laziness in calculating sentiment
 orientation.  Once we've identified probable opinion phrases-- which here are mostly
