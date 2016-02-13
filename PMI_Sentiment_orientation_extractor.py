@@ -110,7 +110,11 @@ def Score_Phrase(phrase, Good='excellent', Bad='terrible',site=None, Ghits=None,
     searchurl=searchbase+'"'+phrase[0]+'+'+phrase[1]+'"'+'+'
     wBad=Get_Num_Hits(searchurl+'terrible')
     wGood=Get_Num_Hits(searchurl+'excellent')
-    eqtop=wGood*Bhits
+    if wBad==None: #when restricted to a small domain, zeroes are a prob
+        wBad=1
+    if wGood==None:
+        wGood=1
+    eqtop=wGood*Bhits 
     eqbot=wBad*Ghits
     score=math.log2(eqtop/eqbot)
     return(score)
@@ -212,18 +216,48 @@ class IR_PMI_SentimentAnalyzer:
         if self.site:
             searchbase='https://ca.search.yahoo.com/search?p=site%3'+self.site+'+'
         self.Ghits=Get_Num_Hits(searchbase+self.Good)
+        if self.Ghits==None or self.Ghits<3000:
+            print('You may want to consider a different combination of site/complimentary word.')
+            print("'%s' only appears '%s' times on '%s'." %(self.Good, self.Ghits, self.site))
         self.Bhits=Get_Num_Hits(searchbase+self.Bad)
+        if self.Bhits==None or self.Bhits<3000:
+            print('You may want to consider a different combination of site/insulting word.')
+            print("'%s' only appears '%s' times on '%s'." %(self.Bad, self.Bhits, self.site))
     
     def ScoreReview(self,tokenizedSents):
+        
+        matches=get_matches(tokenizedSents)
         output=[]
-        for sent in tokenizedSents:
-            output.append([(match,Score_Phrase(match[0], Good=self.Good,Bad=self.Bad,
-                                site=self.site,Ghits=self.Ghits,Bhits=self.Bhits))
-                                for match in get_matches([sent],self.matcher)])
+        for sent in matches:
+            if sent!=[]:
+                output.append([(match,Score_Phrase(match, Good=self.Good, 
+                                Bad=self.Bad,site=self.site, Ghits=self.Ghits,
+                                Bhits=self.Bhits)) for match in sent])
+            else:
+                output.append(None)
         
         return(output)
         
+    def ScoreReviewBySentence(self, tokenizedSents):
+        scored=ScoreReview(tokenizedSents)
+        sentScores=[]
+        for score in scored:
+            if score==None:
+                
         
             
-pm=IR_PMI_SentimentAnalyzer(site='www.goodreads.com')
-outer=pm.ScoreReview([tsents[1]])
+pm=IR_PMI_SentimentAnalyzer()
+outer=pm.ScoreReview(tsents)
+
+output=[]
+for sent in mats:
+    if sent!=[]:
+        output.append([(match,Score_Phrase(match, Good=pm.Good, 
+                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
+                        Bhits=pm.Bhits)) for match in sent])
+    else:
+        output.append([])
+        
+Score_Phrase(mats[0][0], Good=pm.Good, 
+                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
+                        Bhits=pm.Bhits)
