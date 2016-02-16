@@ -100,7 +100,7 @@ def OpenDBConnection(dbname='bmcr',collectionname='reviews_raw'):
 
     
 #link=catalogue['1998'][15]
-
+#TODO: find a way to generalize this-- though there really isn't one.
 def process_BMCreview (link, ProblemChildren=ProblemChildrenDefault):
     
    """
@@ -232,7 +232,7 @@ def process_BMCreview (link, ProblemChildren=ProblemChildrenDefault):
             #Stitch all these together then insert
             #open up the dict/json/bson object (whatever) for this review
             try:
-                entry={'_id':keyNumber,
+                entry={'_id':keyNumber, 
                        'Link':link,
                        "ReviwerName":rName,
                        "ReviewerLocation":rLoc,
