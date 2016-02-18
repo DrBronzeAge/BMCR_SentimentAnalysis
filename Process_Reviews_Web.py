@@ -17,7 +17,7 @@ import re
 import pymongo
 
 
-#
+# setting a couple of default values
 bmcrH='http://bmcr.brynmawr.edu/archive.html'
 ProblemChildrenDefault={}    
 #page=bs4.BeautifulSoup(requests.get(bmcrH).text)
@@ -26,20 +26,32 @@ ProblemChildrenDefault={}
 ##simple fix for most recent year
 #yr_arch[-1]='http://bmcr.brynmawr.edu/'+yr_arch[-1]
 
-def findReviewLinks(home=bmcrH, Indexpattern='http.*[1-2][0-9]{3}',Reviewpattern='http.*[0-9][0-9].[0-9][0-9].html'):
-    """Function for collecting the links to reviews. It is essentially
-    a spider that is limited to two levels, and that only visits some of the links
-    it finds.  The BMCR has a two level index-- one page of links that lead to 
+def findReviewLinks(home=bmcrH, Indexpattern='http.*[1-2][0-9]{3}',
+                    Reviewpattern='http.*[0-9][0-9].[0-9][0-9].html'):
+                        
+    """Collect url addresses for book reviews and return them as a list.
+    
+    This is essentially a spider that is limited to two levels, and that only
+    visits some of the links it finds. The BMCR has a two level index-- one
+    page of links that lead to 
     an index for each year.
-    Home: a url passed as a string.  This will be the seed for your pseudo-spider
-    Indexpattern: a (uncompiled) regular expression that will act as a filter for the
-                links found on the home page. If you want the spider to visit all of
-                those links rather than some of them, simply set this to '[a-zA-Z]'.
-    Reviewpattern: another (uncompiled) regular expression.  Not all links on the
-                page will be book reviews. This pattern is used to filter for only
-                book reviews. Even if you are confident you have this pattern correct,
-                you will almost certainly need to double-check the list of links
-                before passing it to the parser function.
+    
+    Arguments:
+    Home-- a url passed as a string. This will be the seed for your 
+    pseudo-spider.
+    
+    Indexpattern-- a (uncompiled) regular expression that will act as a filter 
+    for the links found on the home page. If you want the spider to visit all 
+    ofthose links rather than some of them, simply set this to '[a-zA-Z]'.
+    
+    Reviewpattern: another (uncompiled) regular expression.  Not all links on 
+    thepage will be book reviews. This pattern is used to filter for only
+    book reviews. Even if you are confident you have this pattern correct, you
+    will almost certainly need to double-check the list of links before passing
+    it to the parser function.
+    
+    returns:
+    a list of urls
 
     """
     idp=re.compile(Indexpattern)
@@ -58,37 +70,28 @@ def findReviewLinks(home=bmcrH, Indexpattern='http.*[1-2][0-9]{3}',Reviewpattern
 
   
 
-      
-    
-    
-    
-    
-
-
-#catalogue={}
-#def get_rev_links(page,catalogue):
-#    nmatch=re.compile('[1-2][0-9]{3}')
-#    name=nmatch.search(page).group(0)
-#    pattern='[0-9][0-9].[0-9][0-9].html'
-#    ind=bs4.BeautifulSoup(requests.get(page).text)
-#    
-#    revs=[link.get('href') for link in ind.find_all('a') if re.search(pattern, link.get('href'))]
-#    catalogue[name]=revs
-#    return (catalogue)
-#
-#for year in yr_arch:
-#    get_rev_links(year, catalogue)
- 
 def OpenDBConnection(dbname='bmcr',collectionname='reviews_raw'):
-    """Let's connect to the database, this assumes you already have a mongodb 
-    instance running and that it is running on the default port for help 
-    installing and setting up Mongodb, look here:
+    
+    """
+    Open a connection to the default database, return connection object.
+    
+    Let's connect to the database, this assumes you already have a mongodb 
+    instance running and that it is running on the default port. If you're new
+    to MongoDB, you can find help installing and setting up Mongodb here:
     http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/
-    if you have it running on something other than the default port, you probably 
-    don't need my help and won't be running this function.
+    If you have MongoDB running on something other than the default port, 
+    you probably don't need my help and won't be running this function.
+    
+    Arguments:    
     dbname:  string-- filename for this database
+    
     collectionname: string-- collection name for the database
-    these will create a new db and collection if they don't already exist
+    
+    These will create a new db and collection if they don't already exist
+    
+    returns:
+    A connection to the database/collection that you can use to insert or query
+    records.
     """   
     
     client=pymongo.MongoClient() #start a client
@@ -104,26 +107,42 @@ def OpenDBConnection(dbname='bmcr',collectionname='reviews_raw'):
 def process_BMCreview (link, ProblemChildren=ProblemChildrenDefault):
     
    """
-   Parse the web page of a book review into a loose schema
-   and return a tuple (parsedReview, dictionary of bugs). Although the function
-   is built on the assumption that you will be using MongoDB to store the data,
-   it fills the schema with NA values where it fails to collect the real one. 
-   It does this for two reasons: 1) Although you don't *need* it, having your 
-   records follow a schema can make working with a MongoDB
-   collection easier in some instances, and 2) a user may prefer to store this 
-   information in a SQL database or simply populate a dataframe with some 
-   elements for immediate rather than repeated use.
+   
+   Scrape details of book review into loose schema, return a tuple of dicts.
+   
+   Although the function is built on the assumption that you will be using
+   MongoDB to store the data, it fills the schema with NA values where it fails
+   to collect the real one. It does this for two reasons: 1) Although you don't
+   *need* it, having your records follow a schema can make working with a
+   MongoDB collection easier in some instances, and 2) a user may prefer to 
+   store this information in a SQL database or simply populate a dataframe with
+   some elements for immediate rather than repeated use.
+   
+   Function is built with the assumption that you will be calling it
+   iteratively. When it encounters a serious error, it returns None in place of
+   the data, and adds the url to a list of those with problems. This lets you
+   continue execution and return later to resolve any issues. It is recommended
+   that, before you pass the data on to another function or process, you check
+   that it is not None.
    
    Arguments:
    link: string-- pretty self-explanatory, but it is the url for the review you
    want to parse
-   ProblemChildren: dict-- in case you want an easy way to keep track of links
-                   that you failed to fully parse and why.  The idea is that you
-                   keep sending it the same dict, or one that you have collected
-                   from earlier test runs.
-   Returns: (dict,dict)  The first element is the parsed review, the second is a
-   dict containing a running list of link urls that failed to parse in some way.
-   (in case the user wants to return later to fix incomplete entries)
+   
+   ProblemChildren (dict)-- in case you want an easy way to keep track of links
+   that you failed to fully parse and why. The idea is that you keep sending
+   it the same dict, or one that you have collected from earlier test runs. 
+   
+      
+   
+   Returns:
+
+   Entry (dict or None)--  Either the parsed data from the review, or None, in 
+   the event that something critical has failed.
+   
+   ProblemChildren(dict)-- a dict where the keys are urls and the values are a
+   description of the error encountered.
+   
    """
    
    page=bs4.BeautifulSoup(requests.get(link).text)

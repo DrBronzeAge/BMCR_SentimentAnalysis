@@ -23,27 +23,39 @@ import numpy as np
 import pandas as pd
 #from ProcessBMCRStepTwo import stringify
 
-#get our dictionary of sentiment words
-#kept in a separate file for ease
+
 
 with open('sentimentWords.pickle', 'rb') as f:
     diction = pickle.load(f)
+"""
+retrieve the default sentiment dictionary
+"""
 
-#we'll need these later
 frog=nltk.corpus.stopwords.words('french')
 kraut=nltk.corpus.stopwords.words('german')
 wasp=nltk.corpus.stopwords.words('english')
+"""
+Module level variables-- we need them for language tests
+"""
 
-#you'll only need these if you're me    
-cli=pymongo.MongoClient()
-db=cli['bmcr']
-revs=db['reviews_raw']
+  
+#cli=pymongo.MongoClient()
+#db=cli['bmcr']
+#revs=db['reviews_raw']
+
+"""
+Start a connection to the database
+TODO: maybe call the openDBConnection function instead
+"""
 
 class Sentiments(Outputlist):
     """Container Class for the output of the Sentiment Analysis.
+    
        It should only get called in conjunction with the do_analysis()
        method of the SentimentAnalyzer class.
-       On the off chance that it isn't, it expects a list of threeples 
+       
+       Arguments:
+       Outputlist (list)-- this is a list of threeples as below
        (sentiment score,plaintextOfSentence,[TaggedTokens]).
     """
     def __init__(self, Outputlist):
@@ -55,11 +67,26 @@ class Sentiments(Outputlist):
         self.Praise=[(S,P) for S,P,T in Outputlist if S>0]
         self.Blame=[(S,P) for S,P,T in Outputlist if S<0]
         
-    def StoreInMongoDB(self,reviewdb=revs,quer,ObjectName='Sentiments'):
-        """Another method that assumes you're me. This will append the sentiments
+    def StoreInMongoDB(self,reviewdb=revs,quer,AttName='Sentiments'):
+        """
+        Update a record in a MongoDB collection.
+        
+        
+        Another method that assumes you're me. This will append the sentiments
         to the MongoDB record for the review they came from.
-        quer is most likely going to be something on the form 
-        quer={'_id':key} where key is the unique id of this review.
+        
+        Arguments:
+        reviewdb(connection)-- this is actually a connection to a specific
+        collection within the database.
+        
+        quer-- a query that will lead you to the correct record. Will often
+        be of the form:
+        
+            quer={'_id':uniqueIDofThisReview}
+        
+        AttName(str)-- What will this attribute be called? Save yourself
+        heartache and be consistent if you decide to change the default.
+        
         """
         try:
             reviewdb.update_one(quer,{'$set':{ObjectName:self.sentiments}})
@@ -69,7 +96,7 @@ class Sentiments(Outputlist):
             #common problems.
             print("You are not me. I can't diagnose your database problem.")
 
-#TODO Make all of those functions internal class methods
+
 class SentimentAnalyzer(dictionary=diction):
     """This class contains all of the functions necessary to both fine-tune
     your sentiment dictionary, and to actually perform the analysis at scale. 
@@ -78,23 +105,39 @@ class SentimentAnalyzer(dictionary=diction):
     The only parameter the class needs to initialize is a dictionary where the
     keys are 'Sentiment Words' like 'excellent' or 'terrible' and the values are
     strings from the set{'positive','negative','increment','decrement','invert'}.
+    
+    Arguments:
+        dictionary(dict)-- a dict where the keys are words and the values are
+        their sentiment orientation (as above).
+    
     """
     def __init__(self, dictionary):
         self.D=self.dictionary
     #Todo implement a testAccuracy method
     def TestAccuracy(self, GoldenSet):
-        """Call this method to begin calculating the accuracy (F1 Score) of the
+        
+        """
+        Calculates the accuracy of your sentiment analyzer, returns a list.
+        
+        
+        Call this method to begin calculating the accuracy (F1 Score) of the
         current instance of the sentiment analyzer. The process requres the user
-        to provide accurate scores for each sentence in the Golden Set. If the
-        user has some pre-scored sentences, great.  If not, there will be a
+        to provide accurate scores for each sentence in a 'Golden Set'. If the
+        user has some pre-scored sentences, great. If not, there will be a
         method implemented below to make the process easier.  Just as a warning,
         if you plan to adjust your sentiment dictionary based on problems that 
         emerge in this test, you will need to provide an entirely different 
         'GoldenSet' to run the test again, at least if you are actually interested
         in measuring general performance.
-        The golden set should be a list of tuples:
+        
+        Arguments:
+        Goldenset(list)--The golden set should be a list of tuples:
         [(PlaintTextSentence (str), TrueScore(float--usually between -2 and +2))]
-        The output will be four numbers between 0 and 1
+        
+        Returns:
+        A list of six numbers: F1 score for compliments and Criticisms,
+        precision and recall for both of those respectively. Also prints values
+        to console with labels.
         """
         GoldenScores=[ts for s,ts in GoldenSet]
         TestFodder='  '.join([s for s,ts in GoldenSet])
@@ -106,15 +149,26 @@ class SentimentAnalyzer(dictionary=diction):
     
     def AnalyzeReview(self,review):
         """
-        Method to actually do the analysis. It just calls several of the functions
+        Method to actually do the analysis. 
+        
+        It just calls several of the functions
         below. Parameters are the self.D (sentiment dictionary) and the plaintext
         of a review (or reviews, really.  I wouldn't want to join them all into
         one and keep them in a big bag, but if someone else does they can.)
-        """
-
-                                    
         
-    #Todo implement a method to perform the analysis
+        review: string
+        
+        returns: Either False (if the review is in a languageother than English)
+                 or a list of threeples(score, sentence, tokenized_sentence)
+                 
+        
+        """
+        return(DoSentAnalysis(review, self.D))
+    
+        
+    #TODO implement a method to quickly generate a 'GoldenSet' for testing accuracy
+    
+   # def GenerateGoldenSet_FullReviews (self, )
     
         
     
@@ -123,6 +177,8 @@ class SentimentAnalyzer(dictionary=diction):
 
 def stringify(text):
     """
+    Turns a review into a single string.
+    
     The only meaningful input is the value of 'Text' for an object in the 
     BMCR.reviews_raw database.
     Output is a single string.
@@ -130,6 +186,9 @@ def stringify(text):
     of the BMCRs, there's often a lot of html junk still in the text of the 
     reviews Also, the reviews are stored as a list of paragraphs, when for NLP 
     it makes more sense to have a single string.
+    
+    Arguments:
+    text(list)-- a list of things that were in <p> tags in a review.
     """
     tqt=""
     for p in text:
@@ -141,14 +200,26 @@ def stringify(text):
 
 def TagForSentiment(word_tuple, dictionary=diction):
     """
-    Input is a tuple (word, POS_tag) i.e. "Part of Speech" tag.
-    Returns a single string to indicate what kind of sentiment the word conveys
+    Assigns a sentiment value to a word. Returns a string.
+    
     
     This function checks the first element of the tuple (word_tuple) against a 
     dict of domain-specific keywords (dictionary).
     If found, it returns that word's value ('positive','negative','increment','
-    'decrement' or 'invert')
+    'decrement' or 'invert').  If not found, returns 'neutral'.
     Normally called iteratively against each word_tuple in a sentence (list).
+      
+      >>>sentValues=[(word, POS_tag, TagForSentiment(word,POS_tag)) for 
+              word,POS_tag in TokenizedSentence]
+    
+    Arguments:
+    word_tuple(tuple)-- a word and it's POS_tag  i.e. "Part of Speech" tag.
+    
+    dictionary(dict)-- a sentiment dictionary (words and their sentiment values)
+    
+    Returns:
+    a single string to indicate what kind of sentiment the word conveys.
+    
     """
     word=word_tuple[0].lower()
     if word in dictionary.keys():
@@ -157,11 +228,23 @@ def TagForSentiment(word_tuple, dictionary=diction):
     
 def ScoreSentence(sent):
     """
-    Input is a list of threeples (word,POS_tag,sentiment value)
+    Calculate the sentiment score for a sentence, return a float.
+    
+    Takes a sentence that has already been tagged for sentiment and calculates
+    the sentence's overall score. It makes some effort to consider phrases, rather
+    than sentences as it does it's arithmetic.  That is, a positive value in
+    word one possibly shouldn't be inverted because word twenty has a value of
+    'invert' and so on.  The nature of the calculation sometimes produces very
+    high/low numbers. You may want to a apply a cieling to them before you start
+    your actual analysis.
+    
+    
+    Arguements:
+    sent (list)--a list of threeples (word,POS_tag,sentiment value)
+    
+    Returns:
     Output is a single float, most often 0.0
-    Default assumption is that this is a sentence that has been word-tokenized,
-    POS tagged and fed through TagForSentiment
-    Function called iteratively against each sentence in a review
+    
     """
     tot_score=0.0
     marker=0
@@ -196,11 +279,22 @@ def ScoreSentence(sent):
 
 def testLanguage(sample,frog=frog, kraut=kraut, wasp=wasp):
     """
+    Checks the language of a review.  Returns a string
+    
     Simple function to test the language of a document
     Inputs are a string, and lists of stopwords
     Returns a string that indicates language
-    
     We're usually only interested in documents in English
+    
+    Arguments:
+    sample(list)-- a bag of words from the review (can be the whole review)
+
+    frog (list)-- a list of common French words (usually stopwords)
+    
+    kraut(list)-- a list of common German words (ditto)
+    
+    wasp(list)-- a list of common English words (ditto)
+    
     
     """
     franco=len([w for w in sample if w.lower() in frog])
@@ -218,15 +312,24 @@ def testLanguage(sample,frog=frog, kraut=kraut, wasp=wasp):
 
 def DoSentAnalysis(doc,dictionary=diction):
     """
-    Input is assumed to be a document from the BMCR.reveiws_raw database
+    Analyze a review + assign a sentiment score to each sentence. Returns list.    
+    
+    This function pulls the Text of a review out of a database record or
+    similar object, cleans it up a little, then tokenizes (splits into words) 
+    it. If the text is in English, it applies POS_tags then calculates a 
+    Sentiment score for each sentence.
+    
+    Arguments:
+    
+    doc-- is assumed to be a document from the BMCR.reveiws_raw database,
     although it would work on any dict-like object with a field called 'Text'.
-    Output is either False (only happens with documents in languages other than
+    It is assumed that that field is a list.
+    
+    Returns
+    Output is either None (only happens with documents in languages other than
     English), or a list of threeples: 1) Float(score),2)Sentence, as a single,
     string, 3) sentence as a list of (word, POS_tag, sentiment_value) tuples
-    It's big, but the tokenization and POS_tagging is by far the most 'expensive'
-    part of this process. This function returns all of it for cases--like mine--
-    where sacrificing a few MB of disk space by putting the the tagged_tokens in
-    storage is better than having to repeatedly run the tokenizer.
+    
     """
     sents1=nltk.sent_tokenize(stringify(doc['Text']))
     wsents=[nltk.word_tokenize(sent) for sent in sents1] 
@@ -246,19 +349,31 @@ def DoSentAnalysis(doc,dictionary=diction):
         #this is big, but the tokenization algorithm is the most expensive part
         #not needing to run it again if I want to change anything or do
         #something else with it is worth a few mb of HD space
-    return (False)
+    return (None)
 
 
 def CalcFScore(RealSet,TestSet):
     """
-    Function that calculates precision and recall for the sentiment analysis 
-    engine.
-    Input is two lists of floats (or mix of ints and floats), both of which are
-    the scores for a randomly drawn sample of sentences/reviews.
-    TestSet is the scores assigned by the machine, RealSet are the scores
-    (normally assigned by a domain expert, i.e. me) against which they'll be
-    checked.
-
+    Calculates accuracy for the sentiment analysis engine.  Returns list.
+    
+    
+    F1 Score is the harmonic mean of precision (ratio of true positives to all
+    cases labled positive) and recall (ratio of cases labled positive to all
+    things that should be positive)
+    This function calculates separate F1 scores (and components) for sentences
+    which praise a book and sentences which criticise it.
+    
+    Arguments
+    RealSet (list)-- a list of floats which are the verified correct scores for
+        a series of sentences.
+        
+    TestSet (list)-- a list of floats which are the scores assigned by the
+    sentiment analysis engine.
+    
+    Returns:
+     A list of six numbers: F1 score for compliments and Criticisms,
+     precision and recall for both of those respectively. Also prints values
+     to console with labels. 
     """
     pos=[] #both will be filled with a lot of true negatives (TN), some True Positives(TP)
     neg=[] #also False Negatives(FN) and False Positives(FP)
@@ -328,6 +443,9 @@ def CalcFScore(RealSet,TestSet):
     print("Recall for sentences of praise: %.2f" %(praise_recall))
     print("Precision for sentences of blame: %.2f" %(blame_precision))
     print("Recall for sentences of blame: %.2f" %(blame_recall))
+    
+    return([praise_f1,blame_f1,praise_precision,praise_recall,blame_precision,
+            blame_recall])
 
 
 ####################################################################
@@ -350,7 +468,7 @@ def CalcFScore(RealSet,TestSet):
 ##'TrueScore will be done by hand
 #goldens.to_csv('goldenSetForSA.csv')
 ##done by hand, now read it back in
-gs=pd.read_csv('truscore.csv',encoding='UTF-8')
+#gs=pd.read_csv('truscore.csv',encoding='UTF-8')
 #goldens['TrueScore']=gs['TrueScore']
 ##save some edits
 #gs['TrueScore']=goldens['TrueScore']
