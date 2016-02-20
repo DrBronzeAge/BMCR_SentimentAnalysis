@@ -21,6 +21,8 @@ import pymongo
 import pickle
 import numpy as np
 import pandas as pd
+import yattag
+from yattag import doc
 #from ProcessBMCRStepTwo import stringify
 
 
@@ -168,7 +170,10 @@ class SentimentAnalyzer(dictionary=diction):
         
     #TODO implement a method to quickly generate a 'GoldenSet' for testing accuracy
     
-   # def GenerateGoldenSet_FullReviews (self, )
+    def GenerateGoldenSet_FullReviews (self, reviews ):
+        reviews='     '.join(reviews)
+        sents=nltk.sent_tokenize(reviews)
+        
     
         
     

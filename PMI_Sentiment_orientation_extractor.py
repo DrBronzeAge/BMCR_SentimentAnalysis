@@ -30,14 +30,13 @@ import math
 
 TreeBankTags={'adjective':re.compile('JJ'),'noun':re.compile('^NN$|NNS'),
               'adverb':re.compile('^RB$|RBS|RBR'), 'verb':re.compile('^VB$|VBD|VBN|VBG')}
+              
+"""
+Setting default part of speech tags.  They need to be compiled regular 
+expressions to work with TurneyMatcher()
+"""
 
-cli=pymongo.MongoClient()
-db=cli['bmcr']
-revs=db['reviews_raw']
 
-ff=revs.find_one({'Sentiments':{'$exists':True}})
-sents=ff['Sentiments']
-tsents=[s[2] for s in sents]
 
 
         
@@ -45,10 +44,33 @@ tsents=[s[2] for s in sents]
 
 def MakeShingles(sent, shingleSize=3):
     """
+    Breaks a sentence into shingles, returns list.
+    
     This one is pretty self-explanatory, but there's no need to clutter up the 
-    matching function with it.  Expects a list of tuples, but can handle triples 
+    matching function with it. Breaks a sentence into 'shingles' (groups of 3 
+    words).  e.g:
+    
+        The sentence "The cow jumped over the moon", would get shingled to:
+        [(the,cow,jumped),(cow,jumped,over),(jumped,over,the),(over,the,moon)]
+    
+    Expects a list of tuples, but can handle triples 
     that include a dictionary-applied sentiment label for a word, so long as the
-    first and second elements are the word and the PosTag
+    first and second elements are the word and the PosTag.  We need shingles
+    because we are looking at groups of three words to see if they are likely
+    to be part of an opinion/value judgement.
+    
+    Arguments:
+    
+    sent(list)-- a list of tuples(word, POS_tag), will also accept triples
+        (word,POS_tag,SentimentValue), in case you've already used a dictionary-
+        based sentiment analysis system
+        
+    shingleSize(int)-- leave it at the default (3), unless you want to make 
+        major changes
+        
+    Returns: 
+        A list of shingles
+    
     """
     shingles=[]
     for i in range (0,len(sent)-shingleSize):
@@ -59,12 +81,27 @@ def MakeShingles(sent, shingleSize=3):
 
 def Turney_matcher (shingle, tags=TreeBankTags):
     """
-    Based on Turney 2002. These are the patterns that are most likely to be part
-    of an opinion.  Will often be several in a sentence. I assume most people will
-    use the treebank tags, but if not, just feed it a dict with entries that has
-    as keys adjective,noun,adverb and verb, and the values should be compiled
-    regular expressions that will match those tags
-    The shingles need to be lists of three (word,tag) tuples, or triples as above.
+    Finds phrases likely to be opinions, returns tuple
+    
+    
+    Turney 2002 outlines a set of linguestiv patterns that are most likely to
+    be part of an opinion. This function checks a given shingle to see if it 
+    matches any of those rules.  If it does, it returns a tuple of the opinion
+    words, so that they can be assigned a sentiment score via Score_Phrase.
+    
+    Arguments:
+    
+    shingle(list): a tuple or threeple where the first element is a word, and
+        the second element is a Part of Speech tag for that word.
+        
+    tags (dict)-- a dict where the keys include 'noun','verb','adverb' and 
+        'adjective' and the values are compiled regular expressions that match
+        the POS_tags for those parts of speech.  Default is the Penn Treebank
+        tags
+    
+    returns:
+        nothing or a tuple of words.
+    
     """
     adjective,noun,adverb,verb=tags['adjective'],tags['noun'],tags['adverb'],tags['verb']
     
@@ -83,6 +120,25 @@ def Turney_matcher (shingle, tags=TreeBankTags):
 
 def get_matches(sents, matcher=Turney_matcher):
     """
+    Finds all probable opinion words in a document, returns list.
+    
+    This function mostly just makes code easier. It will shingle sentences and
+    send them to a matcher, returning a list where each element is the probable
+    opinion words in that sentence (or None).
+    
+    Arguments:
+    sents(list): A list of tokenized and tagged sentences.
+    
+    matcher (function)-- a function that determines which words are likely to
+        be opinions.  Defeault is the Turney_matcher, which uses POS_tag rules.
+    
+    returns:
+    A list of the same length as the list of sentences. Each element in the list
+    is a list that contains either None or tuples of opinion words (by default,
+    other matchers may return something else.)
+    e.g:
+    
+        [[('good','value)],[None], [('bad','taste'), ('stomach','pain')] etc.]
     
     """
     matches=[]
@@ -93,11 +149,49 @@ def get_matches(sents, matcher=Turney_matcher):
     
 #test=get_matches(tsents)
 
-def Score_Phrase(phrase, Good='excellent', Bad='terrible',site=None, Ghits=None,Bhits=None):
+def Score_Phrase(phrase, Good='excellent', Bad='poor',site=None, Ghits=None,Bhits=None):
     """
-    TODO: Generalize this to accept other baseline terms (for good and bad)
-    Accepts a two word list as input, output is a single float
-    negative numbers indicate negative sentiment, positive numbers positive sentiment
+    Assigns a score to a pair of opnion words.  Returns float.
+    
+    This function assigns a score to opinion words by IR-PMI, or Information
+    Retrieval-Pointwise Mutual Information.  The IR part actually means 
+    web-search, the Pointwise Mutual Information is actually the proximity of 
+    a given phrase to a word meaning 'good', vs. the same for a word meaning
+    'bad'. In this case, we are using yahoo's search, since it gives more
+    stable and reliable numbers of hits.  The actual equation is complex, but 
+    terms cancel until we are left with(for all terms in parenths, assume this
+    refers to the numbber of search results): 
+    
+        log2( ('Good' with opinion phrase*'bad')/('bad' with opinion phrase*'good)  )
+
+    Numbers above zero indicate a positive opinion, numbers below zero indicate
+    a negative opinion.
+    
+    Arguments:
+    Phrase(list)-- a list of two strings (the words in the opinion phrase)
+    
+    Good(str)-- the word you want to use to indicate positive opinions. Turney
+        used 'excellent'. Others are better depending on the subject and any
+        site restrictions you impose
+    
+    Bad(str)-- the word you want to use to indicate negative opinions.
+    
+    site(str)-- if you would like to restrict the search to a single site,
+        provide a url. Anecdotally, www.goodreads.com works well for book reviews.
+    
+    Ghits(long)-- the number of hits that your Good word generates on it's own.
+        Supplying this can save a lot of time if you plan to score many thousands
+        of phrases. Calculated locally if not supplied.
+        
+    Bhits(long)--the number of hits that your Bad word generates on it's own.
+        Supplying this can save a lot of time if you plan to score many thousands
+        of phrases. Calculated locally if not supplied.
+    
+    
+    Returns:
+    A float that is the score for this phrase.  Positive numbers mean
+        complimentary opinions, negative numbers critical opinions.
+   
     """
    
     searchbase='https://ca.search.yahoo.com/search?p='
@@ -108,8 +202,8 @@ def Score_Phrase(phrase, Good='excellent', Bad='terrible',site=None, Ghits=None,
     if not Bhits:
         Bhits=Get_Num_Hits(searchbase+Bad)
     searchurl=searchbase+'"'+phrase[0]+'+'+phrase[1]+'"'+'+'
-    wBad=Get_Num_Hits(searchurl+'terrible')
-    wGood=Get_Num_Hits(searchurl+'excellent')
+    wBad=Get_Num_Hits(searchurl+Good)
+    wGood=Get_Num_Hits(searchurl+Bad)
     if wBad==None: #when restricted to a small domain, zeroes are a prob
         wBad=1
     if wGood==None:
@@ -129,8 +223,103 @@ def Get_Num_Hits(url):
             hits=int(nums.match(tag.text).group(0).replace(',',''))
             return(hits)
             
+            
+            
+class IR_PMI_SentimentAnalyzer:
+#TODO: genaralize this with **kwargs for other matching functions    
+    """
+    Class to actually perform the IR-PMI sentiment analysis. 
+    
+    If you don't know, IR-PMI is the brilliantly lazy way to measure the 
+    sentiment orientation (how positive or negative something is) using the 
+    internet. You use the number of hits generated by a search engine for your 
+    term + some word meaning good, and your term + some word meaning bad.  
+    The actual equation is:
+        log2( (hits_for_term_with_good_word * hits_for_bad_word_only) / 
+                                            (term_with_bad * Good_only)  )
+   
+    Arguments:
+    
+    site(str)-- if you want to restrict the search to a single site, supply the
+        url.  www.goodreads.com, www.epinions.com and www.amazon.com all show 
+        some upside over general search for some topics.
+        
+    Good(str)-- What single word or term do you want to use to mean 'I like 
+        this'?
+    
+    Bad(str)-- What single word or term should mean 'I don't like this'?
+    
+    matcher(function)-- a function that finds 'sentiment phrases', i.e.
+        words/combinations that are likely to be part of an opinion. 
+        The default one is from Turney.
+            
+    tags-- a dictionary where the keys are parts of speech that your matcher
+        needs and the values are compiled regular expressions that match your 
+        POS tagging system. Default is the Penn Treebank tags
+            
+    """
+    def __init__(self,site=None,Good='excellent',Bad='terrible',
+                               matcher=Turney_matcher, tags=TreeBankTags):
+        self.site=site
+        self.Good=Good
+        self.Bad=Bad
+        self.matcher=matcher
+        self.tags=tags
+        searchbase='https://ca.search.yahoo.com/search?p='
+        if self.site:
+            searchbase='https://ca.search.yahoo.com/search?p=site%3'+self.site+'+'
+        self.Ghits=Get_Num_Hits(searchbase+self.Good)
+        if self.Ghits==None or self.Ghits<3000:
+            print('You may want to consider a different combination of site/complimentary word.')
+            print("'%s' only appears '%s' times on '%s'." %(self.Good, self.Ghits, self.site))
+        self.Bhits=Get_Num_Hits(searchbase+self.Bad)
+        if self.Bhits==None or self.Bhits<3000:
+            print('You may want to consider a different combination of site/insulting word.')
+            print("'%s' only appears '%s' times on '%s'." %(self.Bad, self.Bhits, self.site))
+    
+    def ScoreReview(self,tokenizedSents):
+        """
+        Finds and scores opinion phrases in a text, returns list.
+        
+        Use this method when you want to collect all opinion phrases and their
+        corresponding scores.
+        
+        Arguments:
+        tokenizedSents(list)-- A list of sentences, where each sentence is a
+            list of (word, POS_tag) tuples.  To get this: 
+            
+            >>>Review='Some long text.  It is all one string.  But at least it
+                has punctuation'
+            >>>Scorer=IR_PMI_Sentiment_Analyzer()
+            >>>Scorer.ScoreReview(nltk.)
+        
+        """
+        
+        matches=get_matches(tokenizedSents)
+        output=[]
+        for sent in matches:
+            if sent!=[]:
+                output.append([(match,Score_Phrase(match, Good=self.Good, 
+                                Bad=self.Bad,site=self.site, Ghits=self.Ghits,
+                                Bhits=self.Bhits)) for match in sent])
+            else:
+                output.append(None)
+        
+        return(output)
+        
+    def ScoreReviewBySentence(self, tokenizedSents):
+        scored=ScoreReview(tokenizedSents)
+        sentScores=[]
+        for score in scored:
+            if score==None:
+                
+        
+
+
 def ReformExpandSentiments(sval):
     """
+    
+    
     Expects to be sent the "Sentiments" value from a the MongoDB record of a
     BMCR review, as it was created/inserted by the lexicon-based sentiment 
     analysis algorithm of sentimentAnalysisBMCR.py
@@ -183,81 +372,25 @@ class SentimentsInfo:
         def NegativeLexiconSentences(self):
             return([(self.LexiconScores[i],self.SentencesPT[i]) for i in 
             range(0,len(self.LexiconScores)) if LexiconScores[1]<0])
-            
-            
-class IR_PMI_SentimentAnalyzer:
-#TODO: genaralize this with **kwargs for other matching functions    
-    """
-    Class to actually perform the IR-PMI sentiment analysis. If you don't know,
-    IR-PMI is the brilliantly lazy way to measure the sentiment orientation (how
-    positive or negative something is) using the internet.  You use the number of 
-    hits generated by a search engine for your term + some word meaning good, and
-    your term + some word meaning bad.  The actual equation is:
-    log2( (hits_for_term_with_good_word * hits_for_bad_word_only) / (term_with_bad * Good_only)  )
-   
-    Parameters 
-    site-- if you want to restrict the search to a single site.  www.goodreads.com,
-    www.epinions.com and www.amazon.com all show some upside.
-    Good-- what single word or term do you want to use to mean 'i like this'
-    Bad-- ditto but for 'I don't like this'
-    matcher-- a function that finds 'sentiment phrases'  --words/combinations that
-            are likely to be part of an opinion. The default one is from Turney.
-    tags-- a dictionary where the keys are part of speech and the values are
-            compiled regular expressions that match your POS tagging system
-    """
-    def __init__(self,site=None,Good='excellent',Bad='terrible',
-                               matcher=Turney_matcher, tags=TreeBankTags):
-        self.site=site
-        self.Good=Good
-        self.Bad=Bad
-        self.matcher=matcher
-        self.tags=tags
-        searchbase='https://ca.search.yahoo.com/search?p='
-        if self.site:
-            searchbase='https://ca.search.yahoo.com/search?p=site%3'+self.site+'+'
-        self.Ghits=Get_Num_Hits(searchbase+self.Good)
-        if self.Ghits==None or self.Ghits<3000:
-            print('You may want to consider a different combination of site/complimentary word.')
-            print("'%s' only appears '%s' times on '%s'." %(self.Good, self.Ghits, self.site))
-        self.Bhits=Get_Num_Hits(searchbase+self.Bad)
-        if self.Bhits==None or self.Bhits<3000:
-            print('You may want to consider a different combination of site/insulting word.')
-            print("'%s' only appears '%s' times on '%s'." %(self.Bad, self.Bhits, self.site))
-    
-    def ScoreReview(self,tokenizedSents):
-        
-        matches=get_matches(tokenizedSents)
-        output=[]
-        for sent in matches:
-            if sent!=[]:
-                output.append([(match,Score_Phrase(match, Good=self.Good, 
-                                Bad=self.Bad,site=self.site, Ghits=self.Ghits,
-                                Bhits=self.Bhits)) for match in sent])
-            else:
-                output.append(None)
-        
-        return(output)
-        
-    def ScoreReviewBySentence(self, tokenizedSents):
-        scored=ScoreReview(tokenizedSents)
-        sentScores=[]
-        for score in scored:
-            if score==None:
-                
-        
-            
-pm=IR_PMI_SentimentAnalyzer()
-outer=pm.ScoreReview(tsents)
 
-output=[]
-for sent in mats:
-    if sent!=[]:
-        output.append([(match,Score_Phrase(match, Good=pm.Good, 
-                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
-                        Bhits=pm.Bhits)) for match in sent])
-    else:
-        output.append([])
-        
-Score_Phrase(mats[0][0], Good=pm.Good, 
-                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
-                        Bhits=pm.Bhits)
+
+
+
+            
+#here for debugging/testing, since this is still under construction.            
+            
+#pm=IR_PMI_SentimentAnalyzer()
+#outer=pm.ScoreReview(tsents)
+#
+#output=[]
+#for sent in mats:
+#    if sent!=[]:
+#        output.append([(match,Score_Phrase(match, Good=pm.Good, 
+#                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
+#                        Bhits=pm.Bhits)) for match in sent])
+#    else:
+#        output.append([])
+#        
+#Score_Phrase(mats[0][0], Good=pm.Good, 
+#                        Bad=pm.Bad,site=pm.site, Ghits=pm.Ghits,
+#                        Bhits=pm.Bhits)
