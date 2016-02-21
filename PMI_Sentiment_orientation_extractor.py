@@ -290,9 +290,15 @@ class IR_PMI_SentimentAnalyzer:
             
             >>>Review='Some long text.  It is all one string.  But at least it
                 has punctuation'
+            >>>sents=nltk.sent_tokenize(Review) 
+            >>>words=[nltk.word_tokenize(sent) for sent in sents] 
+            >>>tokenizedSents=[nltk.pos_tag(sent) for sent in words]
             >>>Scorer=IR_PMI_Sentiment_Analyzer()
             >>>Scorer.ScoreReview(nltk.)
         
+        Returns:
+        list of the same length as tokenized sentences, where each entry is a 
+        list of tuples (phrase,score)
         """
         
         matches=get_matches(tokenizedSents)
@@ -308,6 +314,34 @@ class IR_PMI_SentimentAnalyzer:
         return(output)
         
     def ScoreReviewBySentence(self, tokenizedSents):
+        """
+        Calculate how complimentary/critical each sentence is. Return list.
+        
+        This is identical to the ScoreReview method, but returns a simple list
+        of floats. Rather than returning scores for individual phrases, it sums
+        the scores for the opinion phrases in each sentence.  As a warning,
+        simple sums may not be the most reliable way to calculate the overall 
+        tenor of a sentence.
+        
+        
+        Arguments:
+        tokenizedSents(list)-- A list of sentences, where each sentence is a
+            list of (word, POS_tag) tuples.  To get this: 
+            
+            >>>Review='Some long text.  It is all one string.  But at least it
+                has punctuation'
+            >>>sents=nltk.sent_tokenize(Review) 
+            >>>words=[nltk.word_tokenize(sent) for sent in sents] 
+            >>>tokenizedSents=[nltk.pos_tag(sent) for sent in words]
+            >>>Scorer=IR_PMI_Sentiment_Analyzer()
+            >>>Scorer.ScoreReview(nltk.)
+        
+        Returns:
+        list of floats. Numbers > 0 indicate positive opinions, numbers < 0
+            indicate the opposite.
+        
+        """
+        
         scored=ScoreReview(tokenizedSents)
         sentScores=[]
         for score in scored:
@@ -318,13 +352,25 @@ class IR_PMI_SentimentAnalyzer:
 
 def ReformExpandSentiments(sval):
     """
-    
+    Applies IR-PMI to the output of a dictionary-based analysis;Returns dict.
     
     Expects to be sent the "Sentiments" value from a the MongoDB record of a
     BMCR review, as it was created/inserted by the lexicon-based sentiment 
-    analysis algorithm of sentimentAnalysisBMCR.py
-    Decided to change it to a dictionary of sentences, each with named elements
-    because accessing a specific element was getting to be a top-heavy headache
+    analysis algorithm of sentimentAnalysisBMCR_Dictionary.py. Also converts
+    datastructure to a dict for easier referencing.
+    
+    Arguments:
+    sval(list)-- assumed to be the 'Sentiments' field of a MongoDB entry, but
+    could also be the output of sentimentAnalysisBMCR_Dictionary.DoSentAnalysis().
+    It should be a list, where each element is of the form [Score,PlainTextSent,
+    TaggedTokens]
+    
+    Returns:
+    a dict object with keys that correspond to enumerate(sval). The value for
+    each key is a dict with the keys ['PlainText','TaggedTokens','SentScoreDict',
+    TurneyPhrasesWScores'] (TurneyPhrasesWScores is the only newly created
+    element.)
+    
     """
     dictSent={}
     SentKeys=[k for k,v in enumerate(sval)]
@@ -343,6 +389,18 @@ def ReformExpandSentiments(sval):
         
         
 class SentimentsInfo:
+    """
+    A container class for working with the output of ReformExpandSentiments()
+    
+    This is a simple class to make accessing the elements of a completed 
+    Sentiment analysis easier. Some of the elements that speak to interesting
+    research questions require several steps to collect.  Wrapping them up in 
+    a class like this makes the code a little cleaner.
+    
+    Arguments:
+    
+    
+    """
    
     def __init__(self,dbobj):
         self.LexiconScores=[dbobj[key]['SentScoreDict'] for key in sorted(dbobj.keys())]
