@@ -398,7 +398,11 @@ class SentimentsInfo:
     a class like this makes the code a little cleaner.
     
     Arguments:
-    
+    dbobj(dict)-- The assumption is that this is a MongoDB query leading to
+        record's 'Sentiments' field, but any dict of the appropriate form will
+        work.  The Appropriate form is: a dict where the keys are the numbers
+        0-(number of sentences in review), and the values are each dicts with
+        keys('SentScoreDict',TurneyPhrasesWScores','TaggedTokens' and 'PlainText')
     
     """
    
@@ -411,23 +415,74 @@ class SentimentsInfo:
 #        self.TurneyScoredSentences=
 #       
         def reviewScoreLexicon(self):
+            """
+            Total score of dictionary-based sentiment analysis.  Returns float.
+            """
             return(sum(self.LexiconScores))
+            
+            
         def TurneyScoreSentence(sent):
+            """
+            Calculate a score for each sentence based on IR-PMI.  Returns list.
+            """
+            
             return(sum([v for f,v in sent]))
+            
+            
         def TurneyreviewScore():
+            """
+            Calculate overal score by IR-PMI.  Returns float.
+            """
+            
             return(sum([TurneyScoreSentence(sent) for sent in self.Turney]))
+            
+            
         def TurneyPositives(sent,thresh=1):
+            """
+            Finds phrases in a sentence that express praise. Returns list.
+            """
+            
             return([' '.join(p) for p,v in sent if v>=thresh])
+            
+            
         def TurneyNegatives(sent, thresh=-1):
+            """
+            Finds phrases in a sentence that express criticism.  Returns list.
+            """            
+            
             return([' '.join(p) for p,v in sent if v<=thresh])
+            
+            
         def AllTurneyPositives(self,thresh=1):
+            """
+            Finds phrases in a review that express praise. Returns list.
+            """
+            
             return([TurneyPositives(sent,thresh) for sent in self.Turney])
+            
+            
         def AllTurneyNegatives(self,thresh=-1):
+            """
+            Finds phrases in a review that express criticism. Returns list.
+            """
+            
             retrun([TurneyNegatives(sent,thresh) for sent in self.Turney])
+            
+            
         def PositveLexiconSentences(self):
+            """
+            Finds positive sentences as rated by dictionary analysis. -->list.
+            """
+            
             return([(self.LexiconScores[i],self.SentencesPT[i]) for i in
             range(0,len(self.LexiconScores)) if LexiconScores[1]>0])
+            
+            
         def NegativeLexiconSentences(self):
+            """
+            Finds negative sentences as rated by dictionary analysis.  -->list.            
+            """
+            
             return([(self.LexiconScores[i],self.SentencesPT[i]) for i in 
             range(0,len(self.LexiconScores)) if LexiconScores[1]<0])
 
