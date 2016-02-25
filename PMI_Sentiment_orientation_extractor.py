@@ -346,6 +346,10 @@ class IR_PMI_SentimentAnalyzer:
         sentScores=[]
         for score in scored:
             if score==None:
+                sentScores.append(0)
+            else:
+                sentScores.append(sum([v for p,v in score]))
+        return(sentScores)
                 
         
 
